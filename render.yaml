@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: post-pilot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 app.py
+    envVars:
+      - key: POST_PILOT_CODE
+        sync: false
