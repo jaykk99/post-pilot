@@ -20,7 +20,9 @@ from pilot.publisher import Publisher, PublishSkipped
 from pilot.store import Store
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = os.environ.get("POST_PILOT_DATA_DIR") or (
+    "/tmp/post-pilot-data" if os.environ.get("VERCEL") else os.path.join(BASE_DIR, "data")
+)
 MEDIA_DIR = os.path.join(DATA_DIR, "media")
 DB_PATH = os.path.join(DATA_DIR, "pilot.db")
 POST_LOG = os.path.expanduser("~/workspace/advertising/post-log.md")
