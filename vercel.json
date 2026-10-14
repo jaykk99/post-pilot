@@ -1,1 +1,6 @@
-{"rewrites":[{"destination":"/api/index?__path=/$1","source":"/(.*)"}]}
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index?__api_path=/:path*" },
+    { "source": "/(.*)", "destination": "/api/index?__path=/$1" }
+  ]
+}
