@@ -61,12 +61,21 @@ async def app(scope, receive, send):
         return
 
     qs_raw = scope.get("query_string", b"").decode()
-    qs = parse_qs(qs_raw, keep_blank_values=True)
-    orig = (qs.get("__path") or [None])[0]
+    # Manual parse for __path (more robust than parse_qs for rewrite params)
+    orig = None
+    qs_parts = []
+    for part in qs_raw.split("&"):
+        if part.startswith("__path="):
+            # URL-decode the __path value
+            from urllib.parse import unquote
+            orig = unquote(part[len("__path="):])
+        elif part.startswith("__api_path="):
+            from urllib.parse import unquote
+            orig = "/api" + unquote(part[len("__api_path="):])
+        elif part and not part.startswith("__path") and not part.startswith("__api_path"):
+            qs_parts.append(part)
+    qs_raw = "&".join(qs_parts)
     if orig:
-        # Rewritten request: restore original path, drop __path param.
-        qs.pop("__path", None)
-        qs_raw = "&".join("%s=%s" % (k, v) for k, vs in qs.items() for v in vs)
         path = orig
     else:
         # Direct hit (no rewrite): strip the /api/index prefix if present.
