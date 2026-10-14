@@ -61,26 +61,23 @@ async def app(scope, receive, send):
         return
 
     qs_raw = scope.get("query_string", b"").decode()
-    # Manual parse for __path (more robust than parse_qs for rewrite params)
-    orig = None
+    # Get the route from the 'route' param (Vercel-native, no rewrite needed)
+    # or from the path directly.
+    route = None
     qs_parts = []
     for part in qs_raw.split("&"):
-        if part.startswith("__path="):
-            # URL-decode the __path value
+        if part.startswith("route="):
             from urllib.parse import unquote
-            orig = unquote(part[len("__path="):])
-        elif part.startswith("__api_path="):
-            from urllib.parse import unquote
-            orig = "/api" + unquote(part[len("__api_path="):])
-        elif part and not part.startswith("__path") and not part.startswith("__api_path"):
+            route = unquote(part[len("route="):])
+        elif part:
             qs_parts.append(part)
     qs_raw = "&".join(qs_parts)
-    if orig:
-        path = orig
+    if route:
+        path = route
     else:
-        # Direct hit (no rewrite): strip the /api/index prefix if present.
+        # Direct path access: /api/index serves the dashboard, strip prefix for API routes
         path = scope.get("path", "/")
-        if path == "/api/index":
+        if path == "/api/index" or path == "/api/index/":
             path = "/"
         elif path.startswith("/api/index/"):
             path = path[len("/api/index"):]

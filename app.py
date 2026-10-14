@@ -130,10 +130,6 @@ class Handler(BaseHTTPRequestHandler):
             if not _check_auth(self):
                 return self._send(401, {"error": "access code required"})
             return self._send(200, api_state())
-        # DEBUG: remove after fixing Vercel routing
-        import os as _os
-        if _os.environ.get("VERCEL"):
-            return self._send(404, {"error": "not found", "debug_path": self.path, "debug_parsed": path})
         return self._send(404, {"error": "not found"})
 
     def _serve_file(self, rel, ctype):

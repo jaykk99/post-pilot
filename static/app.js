@@ -118,19 +118,19 @@ async function handleAction(btn) {
   }
 }
 async function refresh() {
-  STATE = await api("/api/state");
+  STATE = await api("/api/index?route=/api/state");
   hideGate();
   render();
 }
 $("#runBtn").addEventListener("click", async () => {
   const b = $("#runBtn"); b.disabled = true; b.textContent = "Generating...";
-  try { await api("/api/run", {method: "POST"}); toast("Drafts generated."); await refresh(); }
+  try { await api("/api/index?route=/api/run", {method: "POST"}); toast("Drafts generated."); await refresh(); }
   catch (e) { toast("Error: " + e.message); }
   b.disabled = false; b.textContent = "Generate today's drafts";
 });
 $("#analyzeBtn").addEventListener("click", async () => {
   toast("Pulling metrics...");
-  try { await api("/api/analyze", {method: "POST"}); await refresh(); toast("Metrics updated."); }
+  try { await api("/api/index?route=/api/analyze", {method: "POST"}); await refresh(); toast("Metrics updated."); }
   catch (e) { toast("Error: " + e.message); }
 });
 $("#codeBtn").addEventListener("click", async () => {
