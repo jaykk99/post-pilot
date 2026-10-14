@@ -66,9 +66,17 @@ def _draw_banner(img, biz, accent):
 
 def _draw_headline(img, headline, accent):
     draw = ImageDraw.Draw(img)
-    wrapped = textwrap.wrap(headline.upper(), width=18)
-    f = _font(92)
-    total_h = len(wrapped) * 112
+    wrapped = textwrap.wrap(headline.upper(), width=16)
+    # auto-fit: shrink until the widest line fits the frame
+    size = 92
+    while size > 40:
+        f = _font(size)
+        widths = [draw.textbbox((0, 0), line, font=f)[2] for line in wrapped]
+        if max(widths, default=0) <= W - 80:
+            break
+        size -= 6
+    f = _font(size)
+    total_h = len(wrapped) * (size + 20)
     y = (H - 190 - total_h) // 2
     for line in wrapped:
         bbox = draw.textbbox((0, 0), line, font=f)
@@ -76,7 +84,7 @@ def _draw_headline(img, headline, accent):
         # subtle shadow for readability
         draw.text(((W - tw) / 2 + 4, y + 4), line, font=f, fill=(0, 0, 0))
         draw.text(((W - tw) / 2, y), line, font=f, fill=(255, 255, 255))
-        y += 112
+        y += size + 20
     # accent underline
     draw.rectangle([W // 2 - 120, y + 10, W // 2 + 120, y + 18], fill=accent)
     return img
