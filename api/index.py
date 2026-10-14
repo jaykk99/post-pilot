@@ -95,6 +95,9 @@ async def app(scope, receive, send):
         headers[k.decode("latin1")] = v.decode("latin1")
 
     method = scope.get("method", "GET").upper()
+    # Debug: log the path we're about to serve
+    import sys as _sys
+    print(f"DEBUG path={path!r} full_path={full_path!r} scope_path={scope.get('path')!r}", file=_sys.stderr)
     h = _ASGIHandler(method, full_path, headers, body)
     try:
         if method == "GET":
