@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Post Pilot</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>Post Pilot</h1>
+  <div class="hdr-actions">
+    <button id="runBtn" class="primary">Generate today's drafts</button>
+    <button id="analyzeBtn">Pull metrics</button>
+  </div>
+</header>
+<div id="authGate" class="gate hidden">
+  <p>This dashboard is locked. Enter the access code.</p>
+  <input id="codeInput" type="password" placeholder="access code" autocomplete="off">
+  <button id="codeBtn" class="primary">Unlock</button>
+</div>
+<main id="board"></main>
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

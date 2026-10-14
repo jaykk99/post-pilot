@@ -1,0 +1,5 @@
+# Post Pilot is stdlib-only by design (http.server, sqlite3).
+# Runtime deps used if present: Pillow (image placeholders/banners), requests
+# (keyless Pollinations + DuckDuckGo search). Both are preinstalled on the
+# worker image; pip install them if missing:
+#   pip install Pillow requests
