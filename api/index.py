@@ -69,11 +69,15 @@ async def app(scope, receive, send):
         qs_raw = "&".join("%s=%s" % (k, v) for k, vs in qs.items() for v in vs)
         path = orig
     else:
+        # Direct hit (no rewrite): strip the /api/index prefix if present.
         path = scope.get("path", "/")
         if path == "/api/index":
             path = "/"
         elif path.startswith("/api/index/"):
             path = path[len("/api/index"):]
+    # Ensure path starts with / for the stdlib handler's urlparse logic.
+    if not path.startswith("/"):
+        path = "/" + path
     full_path = path + ("?" + qs_raw if qs_raw else "")
 
     body = b""
