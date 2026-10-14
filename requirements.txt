@@ -4,3 +4,4 @@
 # worker image; pip install them if missing:
 #   pip install Pillow requests
 pillow
+requests
