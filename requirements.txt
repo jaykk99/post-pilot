@@ -3,3 +3,4 @@
 # (keyless Pollinations + DuckDuckGo search). Both are preinstalled on the
 # worker image; pip install them if missing:
 #   pip install Pillow requests
+pillow
