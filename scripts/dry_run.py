@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+from datetime import date
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
@@ -22,7 +23,9 @@ from pilot.pipeline import Pipeline  # noqa: E402
 from pilot.publisher import Publisher  # noqa: E402
 from pilot.store import Store  # noqa: E402
 
-RUN_DATE = "2026-10-14"
+# Use today's date: the dashboard API (GET /api/state) only serves drafts for
+# the current day, so the smoke test below needs the pipeline run to match.
+RUN_DATE = date.today().isoformat()
 
 
 def main():
