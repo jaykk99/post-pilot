@@ -14,6 +14,7 @@ import os
 import re
 import textwrap
 
+from . import formats as formats_mod
 from . import media_gen
 from .businesses import POST_TIMES
 
@@ -53,8 +54,12 @@ class TrendScout:
         except Exception:
             return []
 
-    def scout(self, biz, run_date, learnings, n=2):
-        """Return n angle dicts: {theme, hook, body}."""
+    def scout(self, biz, run_date, learnings, n=2, store=None):
+        """Return n angle dicts: {theme, hook, body, format}.
+
+        Each angle also gets a post format assigned by the rotation rules
+        (never yesterday's format, template reel capped weekly).
+        """
         seed_src = biz["slug"] + run_date
         seed = int(hashlib.sha256(seed_src.encode()).hexdigest()[:8], 16)
         bank = list(biz["angles"])
@@ -78,6 +83,12 @@ class TrendScout:
         # Fold any web findings into the body of the first angle as a "seen online" note.
         if web and picks:
             picks[0]["body"] += " Seen online today: " + web[0][:120] + "."
+        # Assign post formats under the rotation rules.
+        if store is not None:
+            assigned = formats_mod.assign_formats(store, biz["slug"],
+                                                  run_date, len(picks))
+            for angle, fmt in zip(picks, assigned):
+                angle["format"] = fmt
         return picks
 
 
@@ -132,13 +143,14 @@ class Designer:
         self.media_dir = media_dir
         self.dry_run = dry_run
 
-    def design(self, biz, angle, run_date, idx):
+    def design(self, biz, angle, run_date, idx, fmt=None):
         fname = "pp-%s-%s-%d.png" % (run_date, biz["slug"], idx)
         out_path = os.path.join(self.media_dir, fname)
+        fmt = fmt or angle.get("format")
         image_prompt = ("social media ad photo, %s, %s, %s, no text, no words, "
                         "no letters, no watermark" % (biz["name"], biz["what"], angle["theme"]))
         media_gen.generate(biz, angle["hook"], image_prompt, out_path,
-                           dry_run=self.dry_run)
+                           dry_run=self.dry_run, fmt=fmt)
         return out_path
 
 
@@ -208,7 +220,8 @@ class Reviewer:
                 themes.append(m.group(1))
         return themes
 
-    def review(self, biz, caption, hashtags, theme, image_path):
+    def review(self, biz, caption, hashtags, theme, image_path,
+                 fmt=None, store=None, run_date=None):
         reasons = []
 
         if "\u2014" in caption or "\u2013" in caption:
@@ -229,6 +242,10 @@ class Reviewer:
             if not any(domain == d or domain.endswith("." + d) for d in allowed):
                 reasons.append("unapproved URL domain in caption: %s" % domain)
                 break
+        # Format rotation gate: never repeat yesterday's format.
+        if fmt and store is not None and run_date:
+            reasons.extend(formats_mod.check_rotation(store, biz["slug"],
+                                                      run_date, fmt))
         # Duplicate-theme check against recent post history.
         new_kw = _keywords(theme)
         for old in self._recent_themes(biz["slug"]):

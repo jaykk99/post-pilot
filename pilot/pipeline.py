@@ -37,7 +37,8 @@ class Pipeline:
         try:
             learnings = self.store.get_learnings(biz["slug"])
             angles = self.scout.scout(biz, run_date, learnings,
-                                      n=self.posts_per_business + 2)
+                                      n=self.posts_per_business + 2,
+                                      store=self.store)
             for idx, angle in enumerate(angles):
                 if len(report["drafts"]) >= self.posts_per_business:
                     break
@@ -56,22 +57,27 @@ class Pipeline:
         return report
 
     def _make_draft(self, biz, angle, run_date, idx):
+        fmt = angle.get("format")
         # copywriter + designer run in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             fut_caption = ex.submit(self.copywriter.write, biz, angle, idx)
-            fut_image = ex.submit(self.designer.design, biz, angle, run_date, idx)
+            fut_image = ex.submit(self.designer.design, biz, angle, run_date, idx, fmt)
             caption = fut_caption.result()
             image_path = fut_image.result()
 
         hashtags, post_time = self.seo.pick(biz, angle, run_date, idx)
 
         ok, reasons = self.reviewer.review(biz, caption, hashtags,
-                                           angle["theme"], image_path)
+                                           angle["theme"], image_path,
+                                           fmt=fmt, store=self.store,
+                                           run_date=run_date)
         if not ok:
             # One revise + re-review, then give up.
             caption = self.copywriter.revise(biz, angle, caption, reasons, seed=idx + 1)
             ok, reasons = self.reviewer.review(biz, caption, hashtags,
-                                               angle["theme"], image_path)
+                                               angle["theme"], image_path,
+                                               fmt=fmt, store=self.store,
+                                               run_date=run_date)
             if not ok:
                 return None
 
@@ -81,9 +87,11 @@ class Pipeline:
             post_time=post_time, image_path=image_path,
             target_facebook=biz["targets"]["facebook"],
             target_instagram=biz["targets"]["instagram"],
-            reviewer_notes="; ".join(reasons) if reasons else "passed first review")
+            reviewer_notes="; ".join(reasons) if reasons else "passed first review",
+            format=fmt or "")
         return {"id": draft_id, "theme": angle["theme"], "image": image_path,
-                "caption": caption, "hashtags": hashtags, "post_time": post_time}
+                "caption": caption, "hashtags": hashtags, "post_time": post_time,
+                "format": fmt or ""}
 
     def run_daily(self, run_date):
         """Run all 6 businesses. Returns list of per-business reports."""

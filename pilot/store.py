@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS drafts (
     target_facebook TEXT,
     target_instagram TEXT,
     status TEXT NOT NULL DEFAULT 'draft',
+    format TEXT NOT NULL DEFAULT '',
     reviewer_notes TEXT,
     created_at INTEGER NOT NULL
 );
@@ -59,6 +60,12 @@ class Store:
         self._lock = threading.Lock()
         with self._lock:
             self.conn.executescript(SCHEMA)
+            # Migration for DBs created before the format column existed.
+            try:
+                self.conn.execute(
+                    "ALTER TABLE drafts ADD COLUMN format TEXT NOT NULL DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass  # column already there
             self.conn.commit()
 
     def _exec(self, sql, args=()):
@@ -75,15 +82,15 @@ class Store:
     # drafts -----------------------------------------------------------
     def save_draft(self, business, run_date, angle_theme, caption, hashtags,
                    post_time, image_path, target_facebook, target_instagram,
-                   reviewer_notes=""):
+                   reviewer_notes="", format=""):
         cur = self._exec(
             """INSERT INTO drafts (business, run_date, angle_theme, caption, hashtags,
                post_time, image_path, target_facebook, target_instagram, status,
-               reviewer_notes, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               format, reviewer_notes, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (business, run_date, angle_theme, caption, json.dumps(hashtags),
              post_time, image_path, target_facebook, target_instagram,
-             "draft", reviewer_notes, self._now()))
+             "draft", format, reviewer_notes, self._now()))
         self._commit()
         return cur.lastrowid
 

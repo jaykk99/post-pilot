@@ -90,7 +90,96 @@ def _draw_headline(img, headline, accent):
     return img
 
 
-def _placeholder(biz, headline, out_path):
+def _draw_format_overlay(img, fmt, headline, accent):
+    """Per-format decoration so the creative's look matches its format.
+
+    Only geometric/label decoration from fixed words; never free text that
+    could invent claims. fmt may be None (base layout).
+    """
+    draw = ImageDraw.Draw(img)
+    f_big = _font(56)
+    f_small = _font(40)
+
+    if fmt == "before-after":
+        # Vertical divider with BEFORE / AFTER labels.
+        draw.line([(W // 2, 0), (W // 2, H - 190)], fill=accent, width=8)
+        for x, label in ((W // 4, "BEFORE"), (3 * W // 4, "AFTER")):
+            bbox = draw.textbbox((0, 0), label, font=f_big)
+            tw = bbox[2] - bbox[0]
+            draw.text((x - tw / 2 + 3, 63), label, font=f_big, fill=(0, 0, 0))
+            draw.text((x - tw / 2, 60), label, font=f_big, fill=(255, 255, 255))
+
+    elif fmt == "how-it-works":
+        # Numbered step rail on the left edge: 1 / 2 / 3.
+        x = 46
+        y = 220
+        for n in ("1", "2", "3"):
+            r = 44
+            draw.ellipse([x - r, y - r, x + r, y + r], fill=accent)
+            bbox = draw.textbbox((0, 0), n, font=f_big)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            draw.text((x - tw / 2, y - th / 2 - 6), n, font=f_big,
+                      fill=(10, 10, 14))
+            y += 190
+        # "HOW IT WORKS" kicker at top.
+        kick = "HOW IT WORKS"
+        bbox = draw.textbbox((0, 0), kick, font=f_small)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) / 2 + 3, 103), kick, font=f_small, fill=(0, 0, 0))
+        draw.text(((W - tw) / 2, 100), kick, font=f_small, fill=accent)
+
+    elif fmt == "tip-card":
+        # Big accent quotation bar on the left + "QUICK TIP" kicker.
+        draw.rectangle([40, 200, 64, H - 240], fill=accent)
+        kick = "QUICK TIP"
+        bbox = draw.textbbox((0, 0), kick, font=f_small)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) / 2 + 3, 103), kick, font=f_small, fill=(0, 0, 0))
+        draw.text(((W - tw) / 2, 100), kick, font=f_small, fill=accent)
+
+    elif fmt == "offer-card":
+        # Accent frame around the whole creative + "OFFER" kicker.
+        w = 14
+        draw.rectangle([w, w, W - w, H - 190 - w], outline=accent, width=w)
+        kick = "TODAY'S OFFER"
+        bbox = draw.textbbox((0, 0), kick, font=f_small)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) / 2 + 3, 103), kick, font=f_small, fill=(0, 0, 0))
+        draw.text(((W - tw) / 2, 100), kick, font=f_small, fill=(255, 255, 255))
+
+    elif fmt == "stock-voiceover":
+        # Subtitle-style caption bar hint in the lower third.
+        bar_h = 74
+        y0 = H - 190 - bar_h - 40
+        draw.rectangle([90, y0, W - 90, y0 + bar_h], fill=(0, 0, 0))
+        line = headline[:44]
+        bbox = draw.textbbox((0, 0), line, font=f_small)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) / 2, y0 + 16), line, font=f_small,
+                  fill=(255, 255, 255))
+
+    elif fmt == "screen-walkthrough":
+        # Browser-chrome bar at top to suggest a screen recording.
+        draw.rectangle([0, 0, W, 96], fill=(12, 12, 16))
+        for i, c in enumerate(((255, 95, 86), (255, 189, 46), (39, 201, 63))):
+            draw.ellipse([36 + i * 52, 30, 68 + i * 52, 62], fill=c)
+
+    elif fmt == "photo-story":
+        # Date-stamp style corner badge (no invented content, just a tag).
+        tag = "ON THE JOB"
+        bbox = draw.textbbox((0, 0), tag, font=f_small)
+        tw = bbox[2] - bbox[0]
+        pad = 24
+        draw.rectangle([40, 40, 40 + tw + pad * 2, 40 + 64], fill=(8, 8, 12))
+        draw.rectangle([40, 40, 40 + tw + pad * 2, 46], fill=accent)
+        draw.text((40 + pad, 52), tag, font=f_small, fill=(255, 255, 255))
+
+    # template-reel and unknown formats: base layout, no overlay.
+    return img
+
+
+def _placeholder(biz, headline, out_path, fmt=None):
     top, bottom, accent = PALETTE.get(biz["slug"], DEFAULT_PALETTE)
     img = Image.new("RGB", (W, H), top)
     draw = ImageDraw.Draw(img)
@@ -103,6 +192,7 @@ def _placeholder(biz, headline, out_path):
     # faint diagonal texture
     for i in range(0, W + H, 90):
         draw.line([(i, 0), (i - H // 3, H)], fill=(255, 255, 255, 12), width=2)
+    _draw_format_overlay(img, fmt, headline, accent)
     _draw_headline(img, headline, accent)
     _draw_banner(img, biz, accent)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
@@ -134,7 +224,7 @@ def _pollinations(biz, image_prompt, out_path, timeout=90):
     return None
 
 
-def generate(biz, headline, image_prompt, out_path, dry_run=False):
+def generate(biz, headline, image_prompt, out_path, dry_run=False, fmt=None):
     """Generate the 1080x1350 creative. Returns the output path.
 
     In real mode the AI image gets our banner burned over the bottom, so any
@@ -146,8 +236,9 @@ def generate(biz, headline, image_prompt, out_path, dry_run=False):
         got = _pollinations(biz, image_prompt, out_path)
         if got:
             img = Image.open(out_path).convert("RGB")
+            _draw_format_overlay(img, fmt, headline, accent)
             _draw_banner(img, biz, accent)
             img.save(out_path, "PNG")
             return out_path
         # fall through to placeholder on any failure
-    return _placeholder(biz, headline, out_path)
+    return _placeholder(biz, headline, out_path, fmt=fmt)
