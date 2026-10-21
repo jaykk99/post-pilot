@@ -51,10 +51,13 @@ def _check_auth(handler):
 
 def _draft_json(d):
     import json as _j
+    from pilot.formats import FORMAT_BY_NAME
     d = dict(d)
     d["hashtags"] = _j.loads(d["hashtags"])
     d["image_url"] = "/media/" + os.path.basename(d["image_path"] or "") \
         if d.get("image_path") else None
+    fmt = d.get("format") or ""
+    d["format_label"] = FORMAT_BY_NAME.get(fmt, {}).get("label", fmt or "n/a")
     return d
 
 
@@ -130,6 +133,11 @@ class Handler(BaseHTTPRequestHandler):
             if not _check_auth(self):
                 return self._send(401, {"error": "access code required"})
             return self._send(200, api_state())
+        if path == "/api/queue":
+            if not _check_auth(self):
+                return self._send(401, {"error": "access code required"})
+            from pilot.queue import queue_summary
+            return self._send(200, queue_summary(store, _today()))
         return self._send(404, {"error": "not found"})
 
     def _serve_file(self, rel, ctype):
@@ -159,6 +167,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        import re
         if path.startswith("/api/") and not _check_auth(self):
             return self._send(401, {"error": "access code required"})
         body = self._body()
@@ -178,8 +187,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True,
                                     "results": pipe.run_analyst()})
 
-        m = None
-        import re
+        m = re.match(r"^/api/queue/move/(\d+)$", path)
+        if m:
+            # Reschedule one draft to another posting slot. Planning only:
+            # does not approve or publish anything.
+            from pilot.queue import reschedule
+            draft_id = int(m.group(1))
+            try:
+                out = reschedule(store, draft_id, body.get("post_time", ""))
+            except (KeyError, ValueError) as e:
+                return self._send(400, {"error": str(e)})
+            return self._send(200, {"ok": True, "draft": _draft_json(out)})
+
+        if path == "/api/queue/resolve":
+            # Move conflicted drafts to free slots. Planning only.
+            from pilot.queue import auto_resolve_conflicts
+            moves = auto_resolve_conflicts(store, _today())
+            return self._send(200, {"ok": True, "moves": moves})
+
         m = re.match(r"^/api/drafts/(\d+)/(approve|reject)$", path)
         if m:
             draft_id, action = int(m.group(1)), m.group(2)
@@ -229,9 +254,10 @@ class Handler(BaseHTTPRequestHandler):
                 store.set_status(draft_id, "published")
                 append_post_log(
                     "- %s | business: %s | %s: %s via post-pilot | theme: %s | "
-                    "image: %s | result: PUBLISHED - %s" % (
+                    "format: %s | image: %s | result: PUBLISHED - %s" % (
                         d["run_date"], d["business"], platform,
                         result.get("target", ""), d["angle_theme"],
+                        d.get("format") or "n/a",
                         os.path.basename(d["image_path"] or ""),
                         result.get("post_id", "")))
             return self._send(200, result)

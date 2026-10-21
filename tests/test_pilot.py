@@ -421,5 +421,72 @@ class TestPipelineDryRun(unittest.TestCase):
         store.close()
 
 
+class TestQueue(unittest.TestCase):
+    def setUp(self):
+        from pilot.queue import reschedule
+        self.store, self.tmp = make_store()
+        # two drafts, same business, same slot -> conflict
+        self.d1 = self.store.save_draft(
+            "gutter-genie", TODAY, "t1", "c1", ["#a"], "09:00",
+            None, None, None, format="tip-card")
+        self.d2 = self.store.save_draft(
+            "gutter-genie", TODAY, "t2", "c2", ["#a"], "09:00",
+            None, None, None, format="photo-story")
+
+    def tearDown(self):
+        self.store.close()
+
+    def test_find_conflicts(self):
+        from pilot.queue import find_conflicts
+        rows = self.store.list_drafts(run_date=TODAY,
+                                      business="gutter-genie")
+        c = find_conflicts(rows)
+        self.assertEqual(len(c), 1)
+        self.assertEqual(c[0][0], "09:00")
+        self.assertEqual(sorted(c[0][1]), sorted([self.d1, self.d2]))
+
+    def test_summary_counts_conflicts(self):
+        from pilot.queue import queue_summary
+        s = queue_summary(self.store, TODAY)
+        gg = [b for b in s["businesses"] if b["slug"] == "gutter-genie"][0]
+        self.assertEqual(gg["live"], 2)
+        self.assertEqual(s["total_conflicts"], 1)
+        self.assertIn("Tip Card", gg["formats"])
+
+    def test_next_free_slot(self):
+        from pilot.queue import next_free_slot
+        self.assertEqual(next_free_slot(self.store, "gutter-genie", TODAY),
+                         "12:30")
+
+    def test_reschedule_moves_and_validates(self):
+        from pilot.queue import reschedule
+        out = reschedule(self.store, self.d2, "12:30")
+        self.assertEqual(out["post_time"], "12:30")
+        self.assertEqual(out["slot_warning"], "")
+        with self.assertRaises(ValueError):
+            reschedule(self.store, self.d2, "25:00")
+        with self.assertRaises(KeyError):
+            reschedule(self.store, 99999, "12:30")
+        self.store.set_status(self.d1, "rejected")
+        with self.assertRaises(ValueError):
+            reschedule(self.store, self.d1, "12:30")
+
+    def test_auto_resolve_conflicts(self):
+        from pilot.queue import auto_resolve_conflicts, find_conflicts
+        moves = auto_resolve_conflicts(self.store, TODAY)
+        self.assertEqual(len(moves), 1)
+        self.assertEqual(moves[0]["from"], "09:00")
+        self.assertEqual(moves[0]["to"], "12:30")
+        rows = self.store.list_drafts(run_date=TODAY,
+                                      business="gutter-genie")
+        self.assertEqual(find_conflicts(rows), [])
+
+    def test_export_markdown(self):
+        from pilot.queue import export_queue_markdown
+        md = export_queue_markdown(self.store, TODAY)
+        self.assertIn("CONFLICT", md)
+        self.assertIn("#%d" % self.d1, md)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
