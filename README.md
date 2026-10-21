@@ -54,6 +54,40 @@ python3 scripts/dry_run.py
 
 Runs all 6 businesses x 2 posts through the reviewer gate with mocked subprocess (any publish attempt raises), verifies every image is 1080x1350, self-tests the reviewer against a bad caption, and smoke-tests the dashboard API. Expected: 12 drafts, 0 publish calls.
 
+## Tests
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+47 tests, stdlib only, zero network, zero publishing. Covers the reviewer gate, copywriter sanitize/revise, scout determinism, format rotation rules, store roundtrip + schema migration, per-format creative rendering for every business, the publisher dry-run subprocess-proof, queue management, and a full end-to-end pipeline run.
+
+## Config validation
+
+```bash
+python3 scripts/validate_config.py
+```
+
+Lints `pilot/businesses.py` before a run: unique slugs, phone/email/domain/time syntax, hashtag banks (4-10, brand tag first), no em dashes or invented prices in any text, unique angle themes, valid per-angle formats, and a media palette for every business.
+
+## Format rotation
+
+Every draft gets a post format from `pilot/formats.py` (before/after composite, how-it-works explainer, stock+voiceover, screen walkthrough, photo/story, tip card, offer card, template reel). The rules, enforced by the reviewer gate:
+
+- Never the same format two days in a row per business.
+- No duplicate format within one day's drafts for a business.
+- Template reel max 1x per business per week.
+
+The Designer varies the creative layout per format (before/after divider, explainer step rail, tip kicker, offer frame, etc.). Formats are stored on each draft, shown in the dashboard, and logged to the advertising post log on publish.
+
+## Queue management
+
+```bash
+python3 scripts/report.py [YYYY-MM-DD]   # writes data/reports/PP-<date>.md
+```
+
+Dashboard API: `GET /api/queue` (queue state + slot conflicts), `POST /api/queue/move/<draft_id>` (reschedule a draft's posting slot), `POST /api/queue/resolve` (auto-move conflicted drafts to free slots). Planning only: none of these approve or publish anything.
+
 ## Deploy
 
 Not yet deployed. To put it on Render (free tier):
